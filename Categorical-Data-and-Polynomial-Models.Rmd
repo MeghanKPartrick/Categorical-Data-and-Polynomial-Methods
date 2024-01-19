@@ -1,0 +1,270 @@
+---
+title: 'Categorical Data and Polynomial Models'
+geometry: margin = 0.9in
+output:
+  word_document: default
+  html_notebook: default
+  pdf_document: default
+---
+
+__Situation:__ Suppose that you are interested in purchasing a used vehicle. How much should you expect to pay?  Obviously the price will depend on the type of vehicle you get (the model) and how much it's been used. For this assignment you will investigate how the price might depend on the Year and mileage, as well as the state where the vehicle is purchased.  
+ 
+__Data Source:__ To get a sample of vehicles, begin with the UsedCars CSV file. The data was acquired by scraping TrueCar.com for used vehicle listings on 9/24/2017 and contains more than 1.2 million used vehicles.
+
+
+```{r}
+library(readr)
+library(car)
+
+UsedCars <- read_csv("UsedCars.csv")
+ModelOfMyChoice = "FocusSE"
+StateOfMyChoice = "NC"
+
+# Taking a subset of my model vehicle from your state
+MyVehicles = subset(UsedCars, Model==ModelOfMyChoice & State==StateOfMyChoice)
+
+```
+
+
+#### MODEL #4: Use Year and Miles as predictors for Price ####
+
+1. Construct a model using two predictors (_Year_ and _Mileage_) with _Price_ as the response variable and provide the summary output.
+
+2. Assess the importance of each of the predictors in the regression model - be sure to indicate the specific value(s) from the summary output you are using to make the assessments. Include hypotheses and conclusions in context.
+
+```{r}
+mod=lm(Price~Year+Mileage, data=MyVehicles)
+summary(mod)
+```
+
+
+Both of these predictors, year and mileage, are important to this model. The null hypothesis of these tests is that the slope estimate is zero to each of these variable as they are added on. The alternative hypothesis is stating that each variable, as it is added on, has a nonzero slope. As we can see, the p-values for both tests of slope show significant values (<2e-16). With these significant values, we can conclude the slope to both of these variables is not zero. 
+
+
+3. Assess the overall effectiveness of this model (with a formal test). Again, be sure to include hypotheses and the specific value(s) you are using from the summary output to reach a conclusion.
+
+```{r}
+summary(mod)
+```
+
+
+Using the f-statistic value, the overall effectiveness of the model is good. The null hypothesis is that both of the coefficients to year and mileage in this model are 0 and the alternative hypothesis is that at least one of these values is nonzero. The p-value is <2.2e-16 meaning that we know at least one of these coefficients is nonzero.
+
+
+4. Compute and interpret the variance inflation factor (VIF) for your predictors.
+
+```{r}
+vif(mod)
+```
+
+The VIF of these values are very low, at about 1.93. Multicollinearity shows at values around 5 and larger. This means that there is very little multicollinearity in this model.
+
+
+5. Suppose that you are interested in purchasing a vehicle of this model that was four years old (in 2017) with 58K miles. Determine each of the following: a 90% confidence interval for the mean price at this Year and mileage,  and a 90% prediction interval for the price of an individual vehicle at this Year and mileage. Write sentences that carefully interpret each of the intervals (in terms of vehicle prices)
+
+```{r}
+head(MyVehicles)
+newx=data.frame(Year=2013, Mileage=58000)
+predict.lm(mod, newx, interval="confidence", level = 0.90)
+predict.lm(mod, newx, interval="prediction", level = 0.90)
+```
+
+Confidence Interval Interpretation: We are 90% confident that the mean price for vehicles made in 2013 with a mileage of 58,000 is between $9143.85 and $9546.12.
+
+Prediction Interval Interpretation: We are 90% confident that the price of a vehicle made in 2013 with a milage of 58,000 is between $7541.19 and $11148.79.
+
+
+#### MODEL #5: Now Include a Categorical predictor ####    
+    
+For this section you will combine two data sets. Cconstruct this second dataframe with vehicles from the state of your choice, and a third and fourth dataframe with vehicles of your model from a third and fourth state (Choose either Arizona, Florida, or Ohio for the two additional states). 
+
+```{r}
+State1 = MyVehicles
+Statetwo = "GA"
+MyVehiclesGA = subset(UsedCars, Model==ModelOfMyChoice & State==Statetwo)
+Statethree = "FL"
+MyVehiclesFL = subset(UsedCars, Model==ModelOfMyChoice & State==Statethree)
+Statefour = "OH"
+MyVehiclesOH = subset(UsedCars, Model==ModelOfMyChoice & State==Statefour)
+State2 = MyVehiclesGA 
+State3 = MyVehiclesFL 
+State4 = MyVehiclesOH 
+
+CombinedStates = rbind(State1, State2, State3, State4)
+head(CombinedStates)
+```
+
+6. Fit a multiple regression model using _Year_, _Mileage_, and _State_ to predict the _Price_ of  the vehicle. 
+
+```{r}
+#Multiplying Bools by 1 to get 0 and 1 values in these specific columns
+CombinedStates$GA=(CombinedStates$State=='GA')*1
+CombinedStates$FL=(CombinedStates$State=='FL')*1
+CombinedStates$OH=(CombinedStates$State=='OH')*1
+
+
+head(CombinedStates)
+```
+
+```{r}
+newmod = lm(Price~Year + Mileage + GA + FL + OH, data=CombinedStates)
+summary(newmod)
+```
+
+
+7. Perform a hypothesis test to determine the importance of terms involving _State_ in the model constructed. List your hypotheses, p-value, and conclusion.
+
+```{r}
+mod_reduced = lm(Price~Year + Mileage, data=CombinedStates)
+anova(mod_reduced, newmod)
+```
+
+The above anova test has a null hypothesis of the coefficients for all of the state predictors are 0 and the alternative hypothesis is that there is at least one of the state predictors with a coefficient that is nonzero. As we can see, with the p-value of 1.65e-08, there is significant evidence to say that at least one of these state coefficients is nonzero.
+
+8. Fit a multiple regression model using _Year_, _Mileage_, _State_, and the interactions between _Year_ and _State_, and _Mileage_ and _State_ to predict the _Price_ of  the vehicle.
+
+```{r}
+multiplemod = lm(Price~
+                   Year + 
+                   Mileage + 
+                   GA + 
+                   FL + 
+                   OH + 
+                   I(Year * GA) +
+                   I(Year * FL) +
+                   I(Year * OH) +
+                   I(Mileage * GA) +
+                   I(Mileage * FL) +
+                   I(Mileage * OH), 
+                 data=CombinedStates)
+
+summary(multiplemod)
+```
+
+
+9. Perform a hypothesis test to determine the importance of the terms involving _State_ in the model constructed in question 8. List your hypotheses, p-value, and conclusion.
+```{r}
+anova(mod_reduced, multiplemod)
+```
+
+The null hypothesis is that all of the coefficients to the terms involving state are 0 and the alternative hypothesis is that at least one of the coefficients for the terms involving state is nonzero. The p-value is 1.721e-12. Because this is a statistically significant value we can conclude that at least one of these terms involving state is nonzero.
+
+#### MODEL #6: Polynomial models ####
+One of the drawbacks of the linear model was the “free vehicle” phenomenon where the predicted price is eventually negative as the line decreases for older vehicles. Let’s see if adding one or more polynomial terms might help with this. For this section you should use the dataset with vehicles from four states that you used for model 5.
+
+10. Fit a quadratic model using _Year_ to predict _Price_ and examine the residuals. Construct a scatterplot of the data with the quadratic fit included. You should discuss each of the conditions for the linear model.
+
+```{r}
+quadmod = lm(Price~Year + I(Year^2), data=CombinedStates)
+
+plot(Price~Year, data=CombinedStates)
+
+B0_quadmod = summary(quadmod)$coef[1,1]
+B1_quadmod = summary(quadmod)$coef[2,1]
+B2_quadmod = summary(quadmod)$coef[3,1]
+
+curve(B0_quadmod + B1_quadmod*x + B2_quadmod*x^2, add=TRUE, col='green')
+
+plot(quadmod)
+
+```
+
+
+Linearity: The linearity condition is met. The red line in the residuals vs. fitted plot moves very closely along the dotted line at 0.
+
+Constant Variance: Constant variance is an issue. There are obvious gaps in our data between years in which cannot be filled because of the way the data is put into the system.
+
+Normality: Normality of the residuals is fairly good. There is a slight skew on the right side, but overall the normality condition is met.
+
+11. Perform a hypothesis test to determine if any of the coefficients in this model have nonzero coefficients. List your hypotheses, p-value, and conclusion.
+
+```{r}
+summary(quadmod)
+```
+
+I have used the f-statistic value in order to perform this test. The null hypothesis of this test is that both of the coefficients of year and year^2 are 0, and the alternative hypothesis is that one of these coefficients is nonzero. The p-value for this test is <2.2e-16, meaning this is a significant enough value to say that one of these coefficients is nonzero.
+
+
+12. You are looking at a vehicle that was 4 years old (in 2017) of your model and want to find an interval that is likely to contain its _Price_ using your quadratic model. Construct an interval to predict the value of this vehicle, and include an interpretive sentence in context. 
+
+```{r}
+newx2=data.frame(Year=2013)
+predict.lm(quadmod, newx2, interval="prediction")
+```
+
+We are 95% confident that the price of a vehicle that is four years old is between $6039.54 and $12153.71.
+
+13. Does the quadratic model allow for some _Year_ where a vehicle has a zero or negative predicted price? Justify your answer using a calculation or graph.
+
+
+```{r}
+summary(quadmod)
+plot(Price~Year, data=CombinedStates)
+
+curve(B0_quadmod + B1_quadmod*x + B2_quadmod*x^2, add=TRUE, col='green')
+```
+
+No it does not because the above graph shows that the y-value never goes below zero. This is a quadratic model, which means a parabola is formed. We can see the lowest point hitting around 2004 with a slight increase around what seems the be 2003. The parabola shape will mirror on the other side causing an increase just like we see from 2004 and on.
+
+
+14. Would the fit improve significantly if you also included a cubic term? Does expanding your polynomial model to use a quartic term make significant improvements? Justify your answer.
+
+```{r}
+cubicmod = lm(Price~Year + I(Year^2) + I(Year^3), data=CombinedStates)
+summary(cubicmod)
+
+quarticmod = lm(Price~Year + I(Year^2) + I(Year^3) + I(Year^4), data=CombinedStates)
+summary(quarticmod) 
+
+```
+
+
+There is a multicollinearity issue, which causes the cubic value to not be calculated. The same happens with the quartic model. Because these values were not calculated, we have no way to tell if these models would be better.
+
+#### MODEL #7: Complete second order model ####
+For this section you should again use the dataset with vehicles from four states that you used for models 5 and 6.
+
+15.	Fit a complete second order model for predicting a used vehicle _Price_ based on _Year_ and _Mileage_ and examine the residuals. You should discuss each of the conditions for the linear model.
+
+```{r}
+secondmod = lm(Price~Year + Mileage + I(Year^2) + I(Mileage^2) + I(Year * Mileage), data=CombinedStates)
+
+plot(secondmod)
+```
+
+
+The condition of linearity is met in this model. There may be a very slight bend in the residuals vs fitted plot, but overall the red line is very close to the dotted line. 
+
+The condition of constant variance is mostly met as well. There is less variation on the left, but this could be due to there being less points on the left rather than a variation issue.
+
+The condition of normality is not met. There is a very large right skew, which is shown on the qqnorm plot. The scale moves all the way to positive 6 on the y-axis.
+
+16. Perform a hypothesis test to determine if any of the coefficients in this model have nonzero coefficients. List your hypotheses, p-value, and conclusion.
+
+```{r}
+summary(secondmod)
+```
+
+The f-statistic value in the summary is testing whether any of the coefficients in this model are nonzero. The null hypothesis is that all coefficients in the model are zero and the alternative hypothesis of this test is that at least one of these coefficients is nonzero. The p-value is <2.2e-16, concluding that one of these coefficients is nonzero.
+
+17. Perform a hypothesis test to determine the importance of just the second order terms (quadratic and interaction) in the model constructed in question 15. List your hypotheses, p-value, and conclusion.
+
+```{r}
+regmod = lm(Price~Year + Mileage, data=CombinedStates)
+
+anova(regmod, secondmod)
+```
+
+The null hypothesis for this anova test is that the coefficients of the second order terms is 0 (which means they are of no important). The alternative hypothesis for this test is that at least one of the second order coefficients is nonzero. The p-value is 9.891e-12, so we can conclude that at least one of these second order terms has a nonzero coefficient.
+
+
+18. Perform a hypothesis test to determine the importance of just the terms that involve _Mileage_ in the model constructed in question 15. List your hypotheses, p-value, and conclusion.
+
+```{r}
+yearmod = lm(Price~Year + I(Year^2), data=CombinedStates)
+
+anova(yearmod, secondmod)
+```
+
+
+The null hypothesis of this anova test states that all terms involving mileage have a coefficient value of 0. The alternative hypothesis is that at least one of the coefficients of the mileage terms is nonzero. The p-value is <2.2e-16. This allows us to conclude that at least one of the coefficients of the mileage terms is nonzero.
